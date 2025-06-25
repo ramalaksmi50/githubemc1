@@ -1,0 +1,309 @@
+"use client"
+
+import { useState, useRef, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Play, Pause, RotateCcw, Zap, Timer } from "lucide-react"
+
+export default function DynamicStopwatch() {
+  const [time, setTime] = useState(0)
+  const [isRunning, setIsRunning] = useState(false)
+  const [lapTimes, setLapTimes] = useState<number[]>([])
+  const [backgroundIndex, setBackgroundIndex] = useState(0)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const startTimeRef = useRef<number>(0)
+
+  // Dynamic background gradients
+  const backgrounds = [
+    "from-purple-900 via-blue-900 to-indigo-900", // Default
+    "from-green-800 via-emerald-900 to-teal-900", // Running
+    "from-orange-800 via-red-900 to-pink-900", // Paused
+    "from-cyan-800 via-blue-900 to-purple-900", // Reset
+    "from-yellow-700 via-orange-800 to-red-900", // Lap recorded
+  ]
+
+  const formatTime = (milliseconds: number) => {
+    const totalSeconds = Math.floor(milliseconds / 1000)
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    const ms = Math.floor((milliseconds % 1000) / 10)
+
+    return {
+      minutes: minutes.toString().padStart(2, "0"),
+      seconds: seconds.toString().padStart(2, "0"),
+      milliseconds: ms.toString().padStart(2, "0"),
+    }
+  }
+
+  const handleStart = () => {
+    if (!isRunning) {
+      setIsRunning(true)
+      setBackgroundIndex(1) // Green background for running
+      startTimeRef.current = Date.now() - time
+
+      intervalRef.current = setInterval(() => {
+        setTime(Date.now() - startTimeRef.current)
+      }, 10)
+    }
+  }
+
+  const handlePause = () => {
+    if (isRunning && intervalRef.current) {
+      setIsRunning(false)
+      setBackgroundIndex(2) // Orange/red background for paused
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+  }
+
+  const handleReset = () => {
+    setIsRunning(false)
+    setTime(0)
+    setLapTimes([])
+    setBackgroundIndex(3) // Cyan background for reset
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+
+    // Return to default background after animation
+    setTimeout(() => setBackgroundIndex(0), 1000)
+  }
+
+  const handleLap = () => {
+    if (isRunning) {
+      setLapTimes((prev) => [...prev, time])
+      setBackgroundIndex(4) // Yellow/orange background for lap
+
+      // Return to running background after brief flash
+      setTimeout(() => setBackgroundIndex(1), 500)
+    }
+  }
+
+  // Auto-cycle background colors when running (subtle effect)
+  useEffect(() => {
+    if (isRunning) {
+      const colorCycle = setInterval(() => {
+        setBackgroundIndex((prev) => (prev === 1 ? 0 : 1))
+      }, 3000)
+
+      return () => clearInterval(colorCycle)
+    }
+  }, [isRunning])
+
+  const timeDisplay = formatTime(time)
+
+  return (
+    <div
+      className={`min-h-screen bg-gradient-to-br ${backgrounds[backgroundIndex]} transition-all duration-1000 ease-in-out p-4 relative overflow-hidden`}
+    >
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/5 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-white/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-white/3 rounded-full blur-3xl animate-spin-slow"></div>
+      </div>
+
+      <div className="relative z-10 max-w-lg mx-auto space-y-8">
+        {/* Header */}
+        <div className="text-center pt-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="relative">
+              <Timer className="w-10 h-10 text-white animate-pulse" />
+              {isRunning && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-ping"></div>
+              )}
+            </div>
+            <h1 className="text-4xl font-bold text-white tracking-wide">Dynamic Stopwatch</h1>
+          </div>
+          <p className="text-white/70 text-lg">Experience time with colors</p>
+        </div>
+
+        {/* Main Timer Display */}
+        <Card className="bg-black/20 border-white/20 backdrop-blur-xl shadow-2xl">
+          <CardContent className="p-8">
+            <div className="text-center space-y-8">
+              {/* Time Display */}
+              <div className="space-y-2">
+                <div className="flex justify-center items-baseline gap-2">
+                  <span className="text-7xl font-mono font-bold text-white tracking-wider">{timeDisplay.minutes}</span>
+                  <span className="text-5xl font-mono font-bold text-white/80">:</span>
+                  <span className="text-7xl font-mono font-bold text-white tracking-wider">{timeDisplay.seconds}</span>
+                  <span className="text-4xl font-mono font-bold text-white/60">.{timeDisplay.milliseconds}</span>
+                </div>
+                <div className="text-white/50 text-sm font-medium tracking-widest">
+                  MINUTES : SECONDS . CENTISECONDS
+                </div>
+              </div>
+
+              {/* Control Buttons */}
+              <div className="flex justify-center gap-6">
+                {!isRunning ? (
+                  <Button
+                    onClick={handleStart}
+                    size="lg"
+                    className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-10 py-4 text-lg font-semibold shadow-lg transform hover:scale-105 transition-all duration-200"
+                  >
+                    <Play className="w-6 h-6 mr-3" />
+                    START
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handlePause}
+                    size="lg"
+                    className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white px-10 py-4 text-lg font-semibold shadow-lg transform hover:scale-105 transition-all duration-200"
+                  >
+                    <Pause className="w-6 h-6 mr-3" />
+                    PAUSE
+                  </Button>
+                )}
+
+                <Button
+                  onClick={handleReset}
+                  size="lg"
+                  className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white px-10 py-4 text-lg font-semibold shadow-lg transform hover:scale-105 transition-all duration-200"
+                >
+                  <RotateCcw className="w-6 h-6 mr-3" />
+                  RESET
+                </Button>
+              </div>
+
+              {/* Lap Button */}
+              {isRunning && (
+                <div className="animate-fade-in">
+                  <Button
+                    onClick={handleLap}
+                    className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-8 py-3 font-semibold shadow-lg transform hover:scale-105 transition-all duration-200"
+                  >
+                    <Zap className="w-5 h-5 mr-2" />
+                    LAP
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Lap Times */}
+        {lapTimes.length > 0 && (
+          <Card className="bg-black/20 border-white/20 backdrop-blur-xl shadow-2xl animate-slide-up">
+            <CardContent className="p-6">
+              <div className="text-center mb-4">
+                <h3 className="text-2xl font-bold text-white flex items-center justify-center gap-2">
+                  <Zap className="w-6 h-6 text-yellow-400" />
+                  Lap Times
+                </h3>
+              </div>
+
+              <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar">
+                {lapTimes.map((lapTime, index) => {
+                  const lapDisplay = formatTime(lapTime)
+                  const isLatest = index === lapTimes.length - 1
+
+                  return (
+                    <div
+                      key={index}
+                      className={`flex justify-between items-center p-4 rounded-xl transition-all duration-300 ${
+                        isLatest
+                          ? "bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30 shadow-lg"
+                          : "bg-white/10 hover:bg-white/15"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                            isLatest ? "bg-yellow-400 text-black" : "bg-white/20 text-white"
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                        <span className="text-white/80 font-medium">Lap {index + 1}</span>
+                      </div>
+
+                      <div className="font-mono text-xl font-bold text-white">
+                        {lapDisplay.minutes}:{lapDisplay.seconds}.{lapDisplay.milliseconds}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Lap Statistics */}
+              {lapTimes.length > 1 && (
+                <div className="mt-6 pt-4 border-t border-white/20">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-green-500/20 rounded-lg border border-green-400/30">
+                      <div className="text-green-300 text-sm font-medium">FASTEST</div>
+                      <div className="text-white font-mono text-lg font-bold">
+                        {(() => {
+                          const fastest = formatTime(Math.min(...lapTimes))
+                          return `${fastest.minutes}:${fastest.seconds}.${fastest.milliseconds}`
+                        })()}
+                      </div>
+                    </div>
+                    <div className="text-center p-3 bg-red-500/20 rounded-lg border border-red-400/30">
+                      <div className="text-red-300 text-sm font-medium">SLOWEST</div>
+                      <div className="text-white font-mono text-lg font-bold">
+                        {(() => {
+                          const slowest = formatTime(Math.max(...lapTimes))
+                          return `${slowest.minutes}:${slowest.seconds}.${slowest.milliseconds}`
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <style jsx global>{`
+        @keyframes spin-slow {
+          from { transform: translate(-50%, -50%) rotate(0deg); }
+          to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slide-up {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-spin-slow {
+          animation: spin-slow 20s linear infinite;
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out;
+        }
+        
+        .animate-slide-up {
+          animation: slide-up 0.5s ease-out;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.3);
+          border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.5);
+        }
+      `}</style>
+    </div>
+  )
+}
